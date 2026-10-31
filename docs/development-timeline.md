@@ -1,12 +1,13 @@
-# Tape · Verified snapshot
+# Project status
 
-The source reviewed for this portfolio is commit `e4f221b4eb87c856b9ed370c8b5d59a6ea587771`. GitHub dates that merge to October 29, 2026; it integrates the effects-page work. This identifies the evidence snapshot, not the project's starting date.
+Tape currently runs as a macOS recorder prototype. Its source includes the audio engine, JUCE application, background WAV storage, recording layers, project revisions, effects, bounce and export.
 
-| Evidence | What it establishes | What it does not establish |
+| Area | Implemented | Remaining work |
 | --- | --- | --- |
-| Source snapshot reviewed October 31, 2026 | Engine, storage, calibration and revision implementations are present | A fresh macOS build or listening test |
-| Private Catch2 test files | Tests cover recording alignment, storage failure and threaded playback | Passing results in this environment |
-| Repository roadmap | Records looper, sampler and hardening work still planned | Completed hardware, crash recovery or performance budgets |
-| Separate portfolio examples | Queue and ramp behavior can be inspected and run independently | A substitute for running the full product |
+| Recording | Four tracks, overdubbing and monitoring | Current device demonstration and broader interface testing |
+| Timing | Integer-frame placement and round-trip calibration | Device-specific calibration and listening checks |
+| Editing | Non-destructive layers and undo/redo revisions | Cleanup policy and crash recovery |
+| Testing | Engine, storage-failure and threaded WAV tests in the private repository | Fresh full-application test results for the current build |
+| Hardware | Engine separated from the desktop UI and adapters | Port, CPU/RAM measurements and storage-throughput testing |
 
-No starting date or earlier milestone is asserted without commit or artifact evidence. This documentation showcase was published on October 31, 2026; the product source remains private.
+This repository contains documentation, not the application source or a product download.

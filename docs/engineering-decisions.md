@@ -1,45 +1,19 @@
-# Engineering decisions worth explaining
+# Implementation tradeoffs
 
-These are selected, externally understandable tradeoffs, not a full reproduction of private design documents.
+## Bounded queues and overload
 
-## 1. Separate real-time audio from storage
+A fixed-size queue avoids allocating when a producer sends a message, but it cannot absorb unlimited work. Both producer and consumer must have clear ownership, and callers must handle failed pushes and pops. Tape's command/status queues and audio streaming paths use this boundary to keep control and disk work separate from audio processing.
 
-**Problem:** Filesystem I/O and general heap allocations can have unpredictable timing.
+Playback starvation and recording overflow need different handling. Missing playback data can become silence while the timeline advances; dropped recording data must preserve the placement of later audio. Completing a take also needs special care, so a final chunk can be retried when the queue is full.
 
-**Choice:** Bounded, preallocated messaging between a deadline-sensitive audio callback and background workers.
+## Measured delay and calibration failure
 
-**Tradeoff:** Bounded queues can fill. The code must specify what happens on overflow rather than pretending infinite buffering is available.
+Device and software delay makes capture time different from the time the musician intended to play. A round-trip measurement gives take placement a concrete correction in frames. It also depends on hearing a clear return signal. The calibration therefore needs a failure result, and the application must not treat a failed measurement as a valid offset.
 
-**How it is tested:** Empty/full queue behavior, message order, concurrent producer/consumer behavior, and storage edge cases.
+## Revisions and disk usage
 
-## 2. Align overdubs by measured latency
+Arrangement revisions refer to preserved take files. This makes recording and clearing reversible without copying or rewriting the audio for every edit. The cost is retained material and history metadata. A cleanup policy must respect revisions that still refer to those files.
 
-**Problem:** Recording devices and software introduce delay between playback and capture. Untreated, new takes can sound late.
+## Shared logic and platform adapters
 
-**Choice:** Measure round-trip delay with a known signal and cross-correlation; place takes on a frame-based timeline.
-
-**Tradeoff:** Calibration depends on a clear return signal and should signal failure rather than invent a plausible offset.
-
-## 3. Prefer non-destructive revisions
-
-**Problem:** A musician should be able to undo a recording or clear operation without losing the original take.
-
-**Choice:** Preserve take files and store arrangement revisions. Save history across sessions.
-
-**Tradeoff:** Revision metadata consumes additional memory/storage and requires a clear policy for cleanup and history growth.
-
-## 4. Keep the portable engine separate from the desktop layer
-
-**Problem:** The Mac app uses desktop APIs, but a future embedded instrument may not.
-
-**Choice:** Separate a C++ audio core from device adapters, UI and desktop filesystem implementations.
-
-**Tradeoff:** More explicit interfaces, but clearer test boundaries and portability.
-
-## Claims we should NOT make without fresh evidence
-
-- Zero audio glitches or underruns on every device.
-- A specific latency or CPU performance improvement.
-- A complete commercial hardware implementation.
-- Passing GitHub CI in the original private repo.
-- Full product feature completion based solely on roadmap text.
+Separating the C++ engine from JUCE makes engine behavior independently testable. It also requires explicit interfaces for devices and storage. Those interfaces are useful for a future hardware port, but the target device still needs its own performance and reliability measurements.
