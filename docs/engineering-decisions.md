@@ -1,19 +1,29 @@
-# Implementation tradeoffs
+# Tape implementation tradeoffs
 
-## Bounded queues and overload
+These decisions follow from the recording workflow: audio should continue while the application reads files, aligns new takes and lets the musician reverse edits.
 
-A fixed-size queue avoids allocating when a producer sends a message, but it cannot absorb unlimited work. Both producer and consumer must have clear ownership, and callers must handle failed pushes and pops. Tape's command/status queues and audio streaming paths use this boundary to keep control and disk work separate from audio processing.
+## Why use fixed-size queues?
 
-Playback starvation and recording overflow need different handling. Missing playback data can become silence while the timeline advances; dropped recording data must preserve the placement of later audio. Completing a take also needs special care, so a final chunk can be retried when the queue is full.
+A queue lets one thread pass work to another. Preallocating a fixed number of slots avoids growing a container while processing audio. Each queue has one producer and one consumer, so there is no ambiguity about which side may write each index.
 
-## Measured delay and calibration failure
+The cost is a capacity limit. Callers must handle a rejected push. For playback, unavailable data becomes silence while the timeline advances. For recording, the gap must be reflected in later placement so the remaining audio does not slide earlier. The final recording chunk is retried when necessary so stopping does not immediately discard it just because the queue is full.
 
-Device and software delay makes capture time different from the time the musician intended to play. A round-trip measurement gives take placement a concrete correction in frames. It also depends on hearing a clear return signal. The calibration therefore needs a failure result, and the application must not treat a failed measurement as a valid offset.
+A larger queue can tolerate a longer interruption, but it also uses more memory. It does not solve sustained storage overload.
 
-## Revisions and disk usage
+## Why measure recording delay?
 
-Arrangement revisions refer to preserved take files. This makes recording and clearing reversible without copying or rewriting the audio for every edit. The cost is retained material and history metadata. A cleanup policy must respect revisions that still refer to those files.
+Device-reported timing and the audio's actual round trip can differ. Comparing a known emitted signal with its recorded return measures the complete path being used. Tape finds their relative shift and expresses the correction in audio frames.
 
-## Shared logic and platform adapters
+This measurement needs a usable return signal. When a clear match cannot be established, calibration fails explicitly. Applying an uncertain offset could make alignment worse.
 
-Separating the C++ engine from JUCE makes engine behavior independently testable. It also requires explicit interfaces for devices and storage. Those interfaces are useful for a future hardware port, but the target device still needs its own performance and reliability measurements.
+## Why preserve takes and store revisions?
+
+Copying a complete audio file for every edit would be expensive, while overwriting it would make undo difficult. Tape keeps the takes and changes the arrangement that refers to them. A revision describes the layers on the tracks, so undo can select an earlier arrangement without rewriting the sound.
+
+Retaining takes uses disk space. A future cleanup policy must check whether a file is still referenced by history before removing it.
+
+## Why separate the engine from the desktop app?
+
+The macOS application needs JUCE controls and device APIs. The engine's recording and mixing behavior can be expressed independently of them. Keeping those responsibilities separate allows deterministic engine tests and makes platform dependencies easier to identify.
+
+The additional interfaces take work to maintain. A future hardware port will also need its own CPU, memory and storage measurements; a portable interface is a starting point, not proof that the target device is fast enough.

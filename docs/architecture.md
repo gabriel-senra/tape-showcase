@@ -1,33 +1,42 @@
-# Tape · Architecture
+# Tape architecture
 
-The core boundary is between work that must finish for the next audio block and work that can wait. JUCE connects the device to the portable C++ engine; storage and project editing live outside that callback.
+Tape separates three responsibilities: responding to the musician, producing the next block of sound, and moving recorded audio to or from disk. They share a timeline, but they do not all have the same timing requirements.
+
+## The path through the system
 
 ```mermaid
 flowchart TD
-  UI["UI and control thread"] -->|"commands"| CQ["Bounded command queue"]
-  CQ --> Engine["Audio engine callback"]
-  Engine -->|"status"| SQ["Bounded status queue"]
-  SQ --> UI
-  Device["JUCE device adapter"] --> Engine
-  Engine --> Device
-  Engine -->|"record chunks and stream requests"| Worker["Background storage worker"]
+  UI["Desktop controls and project history"] -->|"commands"| Engine["Audio engine"]
+  Engine -->|"levels and status"| UI
+  Device["JUCE audio device adapter"] -->|"microphone input"| Engine
+  Engine -->|"speaker output"| Device
+  Engine -->|"recording chunks and read requests"| Worker["Background storage worker"]
   Worker -->|"prepared playback chunks"| Engine
-  Worker <--> WAV["WAV take files"]
-  UI --> History["Project revisions"]
+  Worker <--> Files["WAV take files"]
 ```
 
-Arrows to and from storage summarize queue-based communication, not direct filesystem calls from the audio callback. This is a responsibility map rather than a class diagram.
+The arrows between the engine and storage worker represent fixed-size queues, not direct file operations inside audio processing. A queue is a mailbox: one side publishes completed work and the other consumes it when ready.
 
-## Audio deadlines
+## 1. Controls describe what should happen
 
-The engine uses fixed-capacity queues and preallocated buffers. Disk reads, writes and revision editing belong outside the callback. Acquiring a queue index makes the corresponding slot visible; releasing an index publishes completed work. Exactly one producer and one consumer own each queue direction.
+The desktop UI posts commands such as recording, playback or a level change. The engine sends status back, allowing the UI to display levels and transport state without reading mutable audio state directly. Project editing and revision history belong on the control side.
 
-Bounded capacity makes overload explicit. Recording gaps and playback underruns have test coverage in the private repository. Worst-case callback timing still needs measurement on each target device.
+## 2. The engine produces the next block
 
-## Frame-based time
+The audio device calls the engine repeatedly to supply sound. This callback uses prepared buffers and bounded messaging rather than opening files or waiting for storage. Each queue direction has one producer and one consumer, giving ownership a clear rule.
 
-A take is placed on an integer-frame timeline. Calibration compares a known emitted signal with its recorded return to estimate delay. Calibration rejects an inconclusive measurement instead of accepting a guessed offset. Detailed algorithms and calibration orchestration remain private.
+The producer writes a message before publishing its queue position. The consumer sees the published position before reading that message. This ordering prevents it from treating a partly written message as complete.
 
-## Non-destructive editing
+## 3. The worker handles files
 
-Recordings remain as take files; revisions describe which layers are arranged on each track. Undo and redo change the active revision. A new edit after undo replaces the redo branch in metadata without immediately deleting old audio files. This favors recoverability at the cost of storage growth and a future cleanup policy.
+The storage worker reads upcoming playback data and writes recording chunks. If it falls behind, the engine follows explicit gap and overflow policies instead of waiting indefinitely. A finite buffer gives the worker some breathing room; it cannot guarantee that every storage device will keep up.
+
+Worst-case callback timing and storage throughput still need measurement on each target device.
+
+## How timing and editing fit together
+
+A recording's position is an integer count of audio frames. One frame is one sample instant across the channels. The measured playback-to-recording delay shifts take placement on that same timeline.
+
+An arrangement revision refers to take files and their layers. Undo changes the selected arrangement; it does not undo a filesystem write. This is why take storage and editing history can be managed outside the time-sensitive audio callback.
+
+The engine is separate from JUCE-specific controls and device code. That makes its behavior testable without opening the desktop app and leaves a clear adapter boundary for a future embedded implementation.

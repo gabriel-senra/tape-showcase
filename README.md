@@ -1,57 +1,54 @@
 # Tape
 
-Tape is a four-track recorder prototype for macOS, built in C++ with a JUCE interface. It supports recording and layering parts, mixing tracks, undoing edits, and saving a project to continue later. The desktop application is also a way to develop the audio engine for a future standalone instrument.
+Tape is a four-track recorder prototype for macOS. It is built for capturing a musical idea, adding another part, and continuing to play without managing a large recording session. It uses C++ for audio processing and JUCE, a C++ audio application framework, for the desktop interface.
 
-**C++17 · JUCE · WAV/PCM · CMake · Catch2**
+For example, a musician can record a piano part, play it back while adding bass, and balance the two tracks. Adding another recording to an occupied track creates a new layer. Undo removes that edit from the arrangement while preserving the original audio.
 
-## Recording workflow
+**C++17 · JUCE · WAV audio · CMake · Catch2**
 
-Record a part on one track, play it back while recording another, and adjust each track's level or mute. Recording onto an occupied track adds a layer rather than replacing the existing audio. Undo and redo move through arrangement revisions, while the original takes remain available on disk.
+## What the prototype supports
 
-The prototype also includes monitoring, latency calibration, effects, bounce and export. The application and its full source are private; this repository explains the implementation and its tradeoffs.
+- Four-track recording, playback, level control and mute.
+- Sound-on-sound recording, where a new layer plays alongside the earlier layers on the same track.
+- Undo/redo and saved projects for returning to a session later.
+- Input monitoring, recording-delay calibration, effects, track merging and audio export.
 
-## Engineering challenges and how they are handled
+The macOS prototype also provides a way to develop the engine for a future standalone instrument. This repository documents the project; the application source and hardware designs remain private.
 
-### Keeping disk access out of the audio callback
+## Engineering challenges and solutions
 
-The audio device needs each block on time, while file reads and writes can take an unpredictable amount of time. Tape separates the audio engine from a background storage worker. Fixed-capacity queues carry commands, status and audio chunks between those responsibilities without asking the callback to wait for a file operation.
+### Keeping audio moving while files are being read and written
 
-That separation introduces another problem: storage can fall behind. Playback continues with silence for missing data and records the gap in its status. Recording gaps are counted so later chunks retain their correct timeline position. A final recording chunk that cannot be queued immediately is retained for another attempt.
+An audio device repeatedly asks the application for a small block of sound. That function is the **audio callback**, and it needs to finish before the next block is due. Waiting for a file operation inside it could interrupt playback.
 
-### Keeping an overdub aligned with the part being played
+Tape moves WAV-file reads and writes to a background storage worker. Fixed-size queues act as mailboxes between the engine and the worker, letting each side exchange prepared chunks without making the callback wait for disk access.
 
-Audio takes time to travel through playback and recording devices. Placing new audio at its arrival time would make an overdub late. Tape measures the round-trip delay using a known signal and cross-correlation, then corrects take placement in audio frames. An inconclusive calibration returns failure rather than a guessed delay.
+A mailbox can still fill, or storage can fall behind. Missing playback data becomes silence while the timeline advances. Recording gaps are counted so later audio retains its intended position. The final chunk of a take is kept for another attempt if it cannot be queued immediately. These policies make overload visible; they do not make slow storage unlimited.
 
-The timeline uses integer frames so positions remain tied to individual samples. Tests exercise known recording delays, take placement at the beginning of the timeline, and overdubs against an existing track.
+### Making a new recording line up with the part being played
 
-### Making recording and clearing a track reversible
+Playback and recording introduce delay. Without compensation, an overdub can land later than the musician played it.
 
-Destructively replacing a file would make an accidental recording or clear operation difficult to undo. Tape stores recordings as takes and represents the arrangement as revisions containing layers. Undo and redo select a revision; they do not need to rewrite the recorded audio.
+Tape sends a known test signal through the audio path and compares its recorded return with the original. **Cross-correlation** finds the time shift where the signals match most closely. That measured delay is used to correct where a new take is placed.
 
-This preserves the original material, but take files and history consume storage. Cleanup and crash recovery remain part of the hardening work.
+Positions use whole **audio frames**—one sample instant across the audio channels—rather than rounded wall-clock timestamps. If calibration cannot identify a clear match, it returns failure instead of a guessed correction.
 
-### Handling a failed take without corrupting the session
+### Letting a musician undo a recording without losing the take
 
-A write failure must not make an incomplete take appear to be a successful recording. Storage failures are reported, and failed takes are not added to the arrangement. Read failures produce silence and an error event so playback can retain its position while the problem is reported.
+Overwriting an audio file would make an accidental recording hard to reverse. Tape keeps take files and stores **arrangement revisions**: descriptions of which layers play on each track and where they begin. Undo and redo select a different revision instead of rewriting recorded sound.
 
-The private tests include failed reads and writes, stalled storage, a full recording queue, and a new recording after a failed take.
+A new edit after undo replaces the redo branch in the arrangement history. The old take files remain on disk, so this approach preserves material at the cost of additional storage. Cleanup and crash recovery remain part of the reliability work.
 
-### Developing the engine independently of the desktop interface
+### Recovering from a failed recording
 
-The JUCE application handles desktop controls and devices. The audio engine uses standard C++ interfaces, with storage and device adapters outside the core. This lets the same engine logic be tested without opening the application and keeps a future hardware port from depending on the desktop UI.
+A failed disk write must not turn an incomplete take into a successful edit. The storage worker reports the failure, and the failed take is not added to the arrangement. A read failure produces silence and an error event while retaining the timeline position.
 
-An embedded port still needs separate CPU, memory and storage-throughput measurements; portable interfaces alone do not establish hardware readiness.
+Tests cover failed reads and writes, a full recording queue, stalled storage, and starting another take after a failure. This matters because a recorder has to handle an unsuccessful operation as carefully as a successful one.
 
-## Testing
+## Testing and current status
 
-The private repository contains Catch2 tests for queue boundaries and ordering, exact-frame recording placement, layering, storage failure, callback allocation checks, and recording/playback through real threads and WAV files. These tests cover the engine and integration behavior; a fresh macOS device run is still needed for the current demonstration.
+The private repository contains Catch2 automated C++ tests for message ordering, recording placement, layers, storage failures, memory-allocation checks in the audio callback, and recording/playback through real threads and WAV files. Those are engine and integration tests; they do not replace listening and device testing on macOS.
 
-## Further documentation
+The desktop prototype is implemented. The embedded hardware port, sampler and further reliability work are still in development. Device-specific calibration and a current demonstration are still needed.
 
-- [Audio, control and storage boundaries](docs/architecture.md)
-- [Implementation tradeoffs](docs/engineering-decisions.md)
-- [Project status](docs/development-timeline.md)
-
-## Current status
-
-The project is a macOS prototype. The standalone hardware, sampler and additional reliability work remain in development. Full production source and hardware designs are private.
+For a deeper explanation, see [architecture](docs/architecture.md), [implementation tradeoffs](docs/engineering-decisions.md), and [project status](docs/development-timeline.md).
