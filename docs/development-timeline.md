@@ -9,4 +9,4 @@ The source reviewed for this portfolio is commit `e4f221b4eb87c856b9ed370c8b5d59
 | Repository roadmap | Records looper, sampler and hardening work still planned | Completed hardware, crash recovery or performance budgets |
 | Separate portfolio examples | Queue and ramp behavior can be inspected and run independently | A substitute for running the full product |
 
-No starting date or earlier milestone is asserted without commit or artifact evidence. Public release has not occurred as part of this work.
+No starting date or earlier milestone is asserted without commit or artifact evidence. This documentation showcase was published on October 31, 2026; the product source remains private.
