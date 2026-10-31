@@ -20,13 +20,13 @@ Arrows to and from storage summarize queue-based communication, not direct files
 
 ## Audio deadlines
 
-The source uses fixed-capacity queues and preallocated buffers. Disk reads, writes and revision editing belong outside the callback. Acquiring a queue index makes the corresponding slot visible; releasing an index publishes completed work. Exactly one producer and one consumer own each queue direction.
+The engine uses fixed-capacity queues and preallocated buffers. Disk reads, writes and revision editing belong outside the callback. Acquiring a queue index makes the corresponding slot visible; releasing an index publishes completed work. Exactly one producer and one consumer own each queue direction.
 
-Bounded capacity makes overload explicit. Recording gaps and playback underruns have test coverage in the private repository. This review does not certify every path reachable from the callback or measure worst-case execution time.
+Bounded capacity makes overload explicit. Recording gaps and playback underruns have test coverage in the private repository. Worst-case callback timing still needs measurement on each target device.
 
 ## Frame-based time
 
-A take is placed on an integer-frame timeline. Calibration compares a known emitted signal with its recorded return to estimate delay. The source rejects an inconclusive measurement instead of accepting a guessed offset. Detailed algorithms and calibration orchestration remain private.
+A take is placed on an integer-frame timeline. Calibration compares a known emitted signal with its recorded return to estimate delay. Calibration rejects an inconclusive measurement instead of accepting a guessed offset. Detailed algorithms and calibration orchestration remain private.
 
 ## Non-destructive editing
 
