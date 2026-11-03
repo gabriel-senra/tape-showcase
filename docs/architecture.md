@@ -1,8 +1,6 @@
 # Tape architecture
 
-Tape separates three responsibilities: responding to the musician, producing the next block of sound, and moving recorded audio to or from disk. They share a timeline, but they do not all have the same timing requirements.
-
-## The path through the system
+Tape has a desktop interface, an audio engine and a storage worker. The interface handles controls and project editing. The engine processes audio blocks. The worker reads and writes take files.
 
 ```mermaid
 flowchart TD
@@ -15,28 +13,22 @@ flowchart TD
   Worker <--> Files["WAV take files"]
 ```
 
-The arrows between the engine and storage worker represent fixed-size queues, not direct file operations inside audio processing. A queue is a mailbox: one side publishes completed work and the other consumes it when ready.
+## Controls
 
-## 1. Controls describe what should happen
+The interface sends commands for recording, playback and level changes. The engine sends levels and transport status back. Project editing and revision history stay on the control side so they can run independently of audio processing.
 
-The desktop UI posts commands such as recording, playback or a level change. The engine sends status back, allowing the UI to display levels and transport state without reading mutable audio state directly. Project editing and revision history belong on the control side.
+## Audio engine
 
-## 2. The engine produces the next block
+The audio device calls the engine for each block of sound. The engine uses prepared buffers and exchanges messages through fixed-size queues. It does not open files or wait for the storage worker inside the callback.
 
-The audio device calls the engine repeatedly to supply sound. This callback uses prepared buffers and bounded messaging rather than opening files or waiting for storage. Each queue direction has one producer and one consumer, giving ownership a clear rule.
+Each queue has one producer and one consumer. The producer finishes writing a message before publishing its position; the consumer checks that position before reading the message. This establishes when a slot is ready to use.
 
-The producer writes a message before publishing its queue position. The consumer sees the published position before reading that message. This ordering prevents it from treating a partly written message as complete.
+## Storage worker
 
-## 3. The worker handles files
+The worker reads upcoming playback data and writes incoming recording chunks to WAV files. Queues provide temporary storage between the worker and engine. Their capacity is finite; behavior when storage falls behind is described in the [implementation notes](engineering-decisions.md).
 
-The storage worker reads upcoming playback data and writes recording chunks. If it falls behind, the engine follows explicit gap and overflow policies instead of waiting indefinitely. A finite buffer gives the worker some breathing room; it cannot guarantee that every storage device will keep up.
+## Timeline and project state
 
-Worst-case callback timing and storage throughput still need measurement on each target device.
+Recording positions use integer audio frames. The calibrated recording delay adjusts take placement on that timeline. Arrangement revisions refer to take files and layer positions, so changing the selected revision changes the session without rewriting audio.
 
-## How timing and editing fit together
-
-A recording's position is an integer count of audio frames. One frame is one sample instant across the channels. The measured playback-to-recording delay shifts take placement on that same timeline.
-
-An arrangement revision refers to take files and their layers. Undo changes the selected arrangement; it does not undo a filesystem write. This is why take storage and editing history can be managed outside the time-sensitive audio callback.
-
-The engine is separate from JUCE-specific controls and device code. That makes its behavior testable without opening the desktop app and leaves a clear adapter boundary for a future embedded implementation.
+JUCE-specific controls and device code are separate from the engine. That allows engine tests to run without the desktop interface and provides a boundary for a future embedded adapter. CPU, memory and storage behavior still need testing on the target hardware.
