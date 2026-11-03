@@ -1,29 +1,25 @@
-# Tape implementation tradeoffs
+# Tape implementation notes
 
-These decisions follow from the recording workflow: audio should continue while the application reads files, aligns new takes and lets the musician reverse edits.
+## Queue storage
 
-## Why use fixed-size queues?
+The queues reserve a fixed number of slots before audio processing starts. Each has one producer and one consumer, and a push is rejected when the queue is full. This avoids growing a container or waiting for disk access during the audio callback.
 
-A queue lets one thread pass work to another. Preallocating a fixed number of slots avoids growing a container while processing audio. Each queue has one producer and one consumer, so there is no ambiguity about which side may write each index.
+If playback data is unavailable, the engine outputs silence while advancing the timeline. Recording gaps are counted so subsequent chunks keep their intended position. The final chunk of a take is retained for another attempt if it cannot be queued immediately.
 
-The cost is a capacity limit. Callers must handle a rejected push. For playback, unavailable data becomes silence while the timeline advances. For recording, the gap must be reflected in later placement so the remaining audio does not slide earlier. The final recording chunk is retried when necessary so stopping does not immediately discard it just because the queue is full.
+Increasing queue capacity uses more memory and absorbs longer interruptions. It cannot compensate for storage that is consistently slower than the recording rate.
 
-A larger queue can tolerate a longer interruption, but it also uses more memory. It does not solve sustained storage overload.
+## Recording delay
 
-## Why measure recording delay?
+Calibration measures the actual return of a known test signal rather than relying only on the device's reported timing. The matching offset is expressed in audio frames and applied when placing a take. A measurement without a clear match is rejected.
 
-Device-reported timing and the audio's actual round trip can differ. Comparing a known emitted signal with its recorded return measures the complete path being used. Tape finds their relative shift and expresses the correction in audio frames.
+## Take files and arrangement revisions
 
-This measurement needs a usable return signal. When a clear match cannot be established, calibration fails explicitly. Applying an uncertain offset could make alignment worse.
+Recorded audio stays in separate take files. An arrangement revision holds the references and positions needed to play those files together. This keeps undo independent of file rewriting and avoids copying a full recording for every edit.
 
-## Why preserve takes and store revisions?
+Preserved takes use disk space. Cleanup will need to check references from the arrangement history before removing a file.
 
-Copying a complete audio file for every edit would be expensive, while overwriting it would make undo difficult. Tape keeps the takes and changes the arrangement that refers to them. A revision describes the layers on the tracks, so undo can select an earlier arrangement without rewriting the sound.
+## File errors
 
-Retaining takes uses disk space. A future cleanup policy must check whether a file is still referenced by history before removing it.
+The worker reports failed reads and writes to the engine. A failed recording is not added to the arrangement. A read failure produces silence and an error event while preserving the timeline position.
 
-## Why separate the engine from the desktop app?
-
-The macOS application needs JUCE controls and device APIs. The engine's recording and mixing behavior can be expressed independently of them. Keeping those responsibilities separate allows deterministic engine tests and makes platform dependencies easier to identify.
-
-The additional interfaces take work to maintain. A future hardware port will also need its own CPU, memory and storage measurements; a portable interface is a starting point, not proof that the target device is fast enough.
+Tests cover these paths, full queues, stalled storage and recording another take after a failure. Worst-case callback timing and storage throughput still require measurements on each device setup.
