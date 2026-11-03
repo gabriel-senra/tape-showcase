@@ -1,14 +1,9 @@
-# Tape project status
+# Tape status
 
-Tape is currently a macOS recording prototype. The desktop app is the working platform for developing a possible future standalone recorder.
+The current platform is a macOS desktop prototype. It includes four-track recording and playback, overdubbing, monitoring, levels, mute, effects, track merging, export, saved projects and undo/redo.
 
-| Area | Implemented | Next validation or development |
-| --- | --- | --- |
-| Recording and mixing | Four tracks, overdubbing, monitoring, levels and mute | Broader audio-device testing and a current demonstration |
-| Timing | Placement in audio frames and round-trip delay calibration | Calibration and listening checks on each device setup |
-| Editing | Recording layers, saved projects and undo/redo revisions | Unused-take cleanup and crash recovery |
-| Sound and output | Effects, track merging and export | Further listening and workflow testing |
-| Automated testing | Engine, storage-failure and threaded WAV tests in the private repository | A fresh full-application run for the current build |
-| Embedded hardware | Engine separated from desktop-specific code | Porting, memory/CPU measurements and storage-throughput testing |
+Recording placement uses audio frames and round-trip delay calibration. The private test suite covers engine behavior, storage failures and threaded WAV recording/playback. A fresh full-application run, broader device checks and a current demo are pending.
 
-The sampler remains planned. This showcase contains documentation, not an application download or the production source.
+Work remaining includes unused-take cleanup, crash recovery, the sampler and an embedded hardware port. The port will need its own CPU, memory and storage measurements.
+
+This repository contains project documentation. The application source and hardware designs remain private.
