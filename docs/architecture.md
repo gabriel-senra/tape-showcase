@@ -31,4 +31,4 @@ The worker reads upcoming playback data and writes incoming recording chunks to 
 
 Recording positions use integer audio frames. The calibrated recording delay adjusts take placement on that timeline. Arrangement revisions refer to take files and layer positions, so changing the selected revision changes the session without rewriting audio.
 
-JUCE-specific controls and device code are separate from the engine. That allows engine tests to run without the desktop interface and provides a boundary for a future embedded adapter. CPU, memory and storage behavior still need testing on the target hardware.
+JUCE-specific controls and device code are separate from the engine. Engine tests can run independently of the desktop interface.

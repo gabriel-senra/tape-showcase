@@ -1,8 +1,8 @@
 # Tape
 
-A four-track recorder prototype for macOS. Record a musical idea, play it back and add another part in the same session.
+A four-track recorder for macOS. Record a musical idea, play it back and add another part in the same session.
 
-**Built with:** C++ and JUCE · **Current form:** desktop prototype
+**Built with:** C++ and JUCE
 
 ## From an idea to a layered recording
 
@@ -10,8 +10,6 @@ A four-track recorder prototype for macOS. Record a musical idea, play it back a
 2. **Play along.** Listen to the recording while adding another part. Recording onto an occupied track adds a layer alongside what is already there.
 3. **Shape the mix.** Adjust track levels, mute parts, apply effects or merge tracks.
 4. **Keep working.** Undo an edit, return to a saved session or export the audio.
-
-The aim is a small recording workflow for building up musical ideas. The macOS app is also the starting point for a possible standalone recorder.
 
 ## What happens behind the controls
 
@@ -23,11 +21,9 @@ The aim is a small recording workflow for building up musical ideas. The macOS a
 
 **Undo changes the arrangement.** Takes stay in separate audio files. A session records which layers play and where they begin, so undo can restore an earlier arrangement without rewriting the sound. Preserving takes also uses more disk space.
 
-## Where it stands
+## Tests
 
-The desktop prototype includes recording, playback, monitoring, track levels, mute, effects, merging, export, saved projects and undo/redo. The private test suite covers recording placement, layers, storage failures and recording/playback across threads and WAV files.
-
-A current demo and broader device testing are pending. The standalone hardware port, sampler, unused-take cleanup and crash recovery remain unfinished.
+The private test suite covers recording placement, layers, storage failures and recording/playback across threads and WAV files.
 
 ## Further reading
 
